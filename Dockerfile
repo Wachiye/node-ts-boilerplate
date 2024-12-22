@@ -1,19 +1,34 @@
-FROM node:iron-bookworm-slim
+# Use the official Node.js slim image
+FROM node:20.16.0-slim
 
-# Create a new user named "nodeuser"
-RUN useradd --user-group --create-home --system --skel /dev/null --shell /bin/false nodeuser
+# Set environment variables
+ENV NODE_ENV=production
 
-# Switch to the new user
-USER nodeuser
-
-ENV NODE_ENV production
+# Create and set the working directory
 WORKDIR /home/nodeuser/app
-COPY package.json ./
+
+# Create a non-root user
+RUN useradd -m -s /bin/bash nodeuser && chown -R nodeuser:nodeuser /home/nodeuser
+
+# Copy package.json and package-lock.json first for better caching
+COPY package.json package-lock.json ./
+
+# Install only production dependencies
+RUN npm install --ignore-scripts --only=production
+
+# Copy the rest of the application code
 COPY tsconfig.json ./
 COPY swagger.json ./
-COPY .env ./
 COPY src/ ./src
-RUN npm install --ignore-scripts
+
+# Build the project
 RUN npm run build
-EXPOSE 8080 
-CMD npm start
+
+# Change to the non-root user
+USER nodeuser
+
+# Expose the port the app runs on
+EXPOSE 8082
+
+# Set the command to start the application
+CMD ["npm", "start"]
